@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+    nginx:
+        image: "${PROJECT_NAME}_webserver"
+        build:
+            context: docker
+            dockerfile: nginx/Dockerfile
+        container_name: "${PROJECT_NAME}_webserver"
+        ports:
+            - "${PORT_BACKEND}:80"
+        depends_on:
+            - backend
+        restart: always
+        volumes:
+            - ".:/var/www"
+        networks:
+            web_net:
+
+    backend:
+        image: "${PROJECT_NAME}_backend"
+        build:
+            context: docker
+            dockerfile: php/Dockerfile
+            args:
+                - "PUID=${PUID}"
+                - "PGID=${PGID}"
+        container_name: "${PROJECT_NAME}_backend"
+        restart: always
+        environment:
+            - "XDG_CONFIG_HOME=/var/www"
+        volumes:
+            - ".:/var/www"
+        depends_on:
+            - db
+        networks:
+            web_net:
+
+    worker:
+        image: "${PROJECT_NAME}_worker"
+        build:
+            context: docker
+            dockerfile: supervisor/Dockerfile
+            args:
+                - "PUID=${PUID}"
+                - "PGID=${PGID}"
+        container_name: "${PROJECT_NAME}_worker"
+        restart: always
+        volumes:
+            - ".:/var/www"
+        depends_on:
+            - db
+        networks:
+            web_net:
+
+    db:
+        platform: linux/amd64
+        image: "${PROJECT_NAME}_db"
+        build:
+            context: docker
+            dockerfile: mysql/Dockerfile
+        restart: always
+        container_name: "${PROJECT_NAME}_db"
+        volumes:
+            - "./data-db/db/mysql:/var/lib/mysql"
+            - "./data-db/db/dump:/var/dump"
+        environment:
+            - MYSQL_DATABASE=${DB_DATABASE}
+            - MYSQL_USER=${DB_USERNAME}
+            - MYSQL_PASSWORD=${DB_PASSWORD}
+            - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+        ports:
+            - "${PORT_DB}:3306"
+        networks:
+            web_net:
+
+    php-my-admin:
+        image: phpmyadmin
+        container_name: "${PROJECT_NAME}-phpmyadmin"
+        restart: always
+        ports:
+            - "${PORT_WORKBENCH}:80"
+        depends_on:
+            - db
+        networks:
+            web_net:
+networks:
+    web_net:
